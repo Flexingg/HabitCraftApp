@@ -50,10 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } on BridgeException catch (e) {
       _err = e.message;
     }
-    if (mounted) setState(() {
-      _perm = perm; _today = today; _incentives = incentives; _filedToday = filed;
-      _busy = false;
-    });
+    if (mounted) {
+      setState(() {
+        _perm = perm; _today = today; _incentives = incentives; _filedToday = filed;
+        _busy = false;
+      });
+    }
   }
 
   Future<void> _grantPerm() async {
