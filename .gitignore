@@ -1,3 +1,14 @@
+# Build artifacts
 build/
-.android/
 .dart_tool/
+.android/
+*.iml
+
+# IDE
+.idea/
+.vscode/
+
+# Signing secrets — NEVER commit
+android/key.properties
+android/**/keystore/
+android/app/keystore/
