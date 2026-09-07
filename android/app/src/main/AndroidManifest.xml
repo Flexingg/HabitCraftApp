@@ -6,7 +6,25 @@
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.health.READ_SLEEP" tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:ignore="ProtectedPermissions"/>
+    <!-- Nutrition / body measurements / vitals -->
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" tools:ignore="ProtectedPermissions"/>
 
     <!-- Network access to reach the HabitCraft Bridge on hermes-pc -->
     <uses-permission android:name="android.permission.INTERNET"/>

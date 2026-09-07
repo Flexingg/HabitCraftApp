@@ -32,10 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _bridgeErr;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
     setState(() { _busy = true; });
@@ -77,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _connectHealth() async {
     if (!await _health.isAvailable()) {
       _toast('Health Connect missing — opening Play Store to install it.');
-      await _health.installHealthConnect();
+      await _health.install();
       setState(() => _hcAvailable = false);
       await _load();
       return;
@@ -87,10 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case PermissionOutcome.granted:
         _toast('Health Connect access granted.');
       case PermissionOutcome.denied:
-        _toast('Permission not granted. Please allow Health Connect access.');
+        await _showDeniedHelp();
       case PermissionOutcome.healthConnectMissing:
         _toast('Health Connect is not installed. Opening Play Store…');
-        await _health.installHealthConnect();
+        await _health.install();
       case PermissionOutcome.error:
         _toast('Something went wrong requesting access. Check the Android log.');
     }
@@ -98,42 +95,61 @@ class _HomeScreenState extends State<HomeScreen> {
     await _load();
   }
 
+  /// The in-app request didn't surface the Health Connect UI (device-specific).
+  /// Give a one-tap shortcut straight into Health Connect's permission screen.
+  Future<void> _showDeniedHelp() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enable Health Connect access'),
+        content: const Text(
+            'Tap "Open Health Connect", then allow the data types you want to share. '
+            'That flips the switch here — no digging through Android settings.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Open Health Connect')),
+        ],
+      ),
+    );
+    if (go == true) {
+      final opened = await _health.openPermissions();
+      _toast(opened ? 'Opened Health Connect. Flip on what you want, then refresh.' : 'Could not open Health Connect directly.');
+    }
+  }
+
   double? _valueFor(String metric, TodayHealth h) => switch (metric) {
         'STEPS' => h.steps.toDouble(),
         'DISTANCE_KM' => h.distanceKm,
         'CALORIES' => h.energyKcal,
+        'TOTAL_CALORIES' => h.totalKcal,
+        'ACTIVE_MINUTES' => h.exerciseMinutes.toDouble(),
+        'SLEEP_HOURS' => h.sleepHours,
+        'WORKOUTS' => h.workouts.toDouble(),
         _ => null,
       };
 
   Future<void> _fileIncentive(String id) async {
-    try {
-      await widget.api.autoFile(id);
-      await _load();
-    } on BridgeException catch (e) {
-      _toast(e.message);
-    }
+    try { await widget.api.autoFile(id); await _load(); }
+    on BridgeException catch (e) { _toast(e.message); }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _header(),
-        const SizedBox(height: 16),
-        if (!widget.linked) _linkPanel() else _playerBanner(),
-        const SizedBox(height: 16),
-        _healthCard(),
-        const SizedBox(height: 16),
-        Text('Habit Incentives', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        if (_incentives.isEmpty)
-          const Text('No incentives defined yet. Add them on the Rewards tab.',
-              style: TextStyle(color: Colors.grey))
-        else
-          ..._incentives.map(_incentiveTile),
-      ],
-    );
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      _header(),
+      const SizedBox(height: 16),
+      if (!widget.linked) _linkPanel() else _playerBanner(),
+      const SizedBox(height: 16),
+      _healthCard(),
+      const SizedBox(height: 16),
+      Text('Habit Incentives', style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      if (_incentives.isEmpty)
+        const Text('No incentives defined yet. Add them on the Rewards tab.',
+            style: TextStyle(color: Colors.grey))
+      else
+        ..._incentives.map(_incentiveTile),
+    ]);
   }
 
   Widget _header() {
@@ -208,20 +224,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text('⚠ Bridge unreachable ($_bridgeErr). Open settings (gear) to set the URL.',
                 style: const TextStyle(color: Colors.orangeAccent)))
         else if (!_hcAvailable)
-          _action('Health Connect is not installed.', Icons.health_and_safety,
-              'Install Health Connect', _connectHealth)
+          _action('Health Connect is not installed on this phone.',
+              Icons.health_and_safety, 'Install Health Connect', _connectHealth)
         else if (!_perm)
-          _action('Grant Health Connect access to read your real activity.', Icons.health_and_safety,
-              'Connect Health Connect', _connectHealth)
-        else if (_today == null)
-          const Text('No Health Connect data recorded yet today.',
-              style: TextStyle(color: Colors.grey))
+          _action('Allow HabitCraft to read your health data.',
+              Icons.health_and_safety, 'Connect Health Connect', _connectHealth)
+        else if (_today == null || !_today!.any)
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+            Text('No Health Connect data recorded yet today.',
+                style: TextStyle(color: Colors.grey)),
+          ])
         else
-          Row(children: [
-            _stat(Icons.directions_walk, '${_today!.steps}', 'steps'),
-            _stat(Icons.straighten, _today!.distanceKm.toStringAsFixed(2), 'km'),
-            _stat(Icons.local_fire_department, _today!.energyKcal.round().toString(), 'kcal'),
-          ]),
+          Wrap(spacing: 18, runSpacing: 14, children: _statTiles(_today!)),
       ]),
     ));
   }
@@ -230,17 +244,39 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(text, style: const TextStyle(color: Colors.grey)),
       const SizedBox(height: 10),
-      FilledButton.icon(onPressed: onTap, icon: Icon(icon), label: Text(buttonLabel)),
+      Row(children: [
+        FilledButton.icon(onPressed: onTap, icon: Icon(icon), label: Text(buttonLabel)),
+        if (!_perm && _hcAvailable) ...[
+          const SizedBox(width: 8),
+          TextButton(onPressed: () => _health.openPermissions(), child: const Text('Open Health Connect')),
+        ],
+      ]),
     ]);
   }
 
-  Widget _stat(IconData icon, String value, String label) {
-    return Expanded(child: Column(children: [
-      Icon(icon, color: HabitTheme.emeraldBright, size: 30),
+  List<Widget> _statTiles(TodayHealth h) {
+    final List<(IconData, String, String)> raw = [
+      (Icons.directions_walk, h.steps.toString(), 'steps'),
+      (Icons.straighten, h.distanceKm.toStringAsFixed(2), 'km'),
+      (Icons.local_fire_department, h.energyKcal.round().toString(), 'kcal active'),
+      if (h.totalKcal > 0) (Icons.whatshot, h.totalKcal.round().toString(), 'kcal total'),
+      if (h.sleepHours > 0) (Icons.bedtime, h.sleepHours.toStringAsFixed(1), 'h sleep'),
+      if (h.exerciseMinutes > 0) (Icons.fitness_center, '${h.exerciseMinutes}', 'min active'),
+      if (h.workouts > 0) (Icons.directions_run, '${h.workouts}', 'workouts'),
+      if (h.weightKg != null) (Icons.monitor_weight, h.weightKg!.toStringAsFixed(1), 'kg'),
+      if (h.restingHr != null) (Icons.favorite, h.restingHr!.round().toString(), 'bpm rest'),
+      if (h.bodyTempC != null) (Icons.thermostat, '${h.bodyTempC!.toStringAsFixed(1)}°', 'temp'),
+      if (h.spo2 != null) (Icons.air, '${h.spo2!.round()}%', 'SpO2'),
+      if (h.systolic != null) (Icons.bloodtype, '${h.systolic!.round()}/${h.diastolic?.round() ?? '–'}', 'BP'),
+      if (h.hrvMs != null) (Icons.monitor_heart, '${h.hrvMs!.round()}', 'HRV ms'),
+    ];
+    return raw.map((t) => SizedBox(width: 92, child: Column(children: [
+      Icon(t.$1, color: HabitTheme.emeraldBright, size: 26),
       const SizedBox(height: 4),
-      Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-      Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-    ]));
+      Text(t.$2, textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+      Text(t.$3, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+    ]))).toList();
   }
 
   Widget _incentiveTile(dynamic inc) {
@@ -264,14 +300,13 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 2),
           Text(value == null
               ? 'Metric not read on device yet'
-              : '${value.round()} / ${target.round()} ${inc['unit']}',
+              : '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1)} / ${target.toStringAsFixed(target == target.roundToDouble() ? 0 : 1)} ${inc['unit']}',
               style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ])),
         if (earned)
           const Text('✓ earned', style: TextStyle(color: HabitTheme.emerald))
         else if (met && auto)
-          FilledButton(onPressed: _busy ? null : () => _fileIncentive(id),
-              child: const Text('Claim'))
+          FilledButton(onPressed: _busy ? null : () => _fileIncentive(id), child: const Text('Claim'))
         else if (met)
           const Text('target met', style: TextStyle(color: HabitTheme.gold))
         else if (value != null)
