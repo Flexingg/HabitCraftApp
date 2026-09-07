@@ -13,7 +13,7 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-class _StatsScreenState extends State<StatsScreen> {
+class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
   final _health = HabitHealth();
   String? _err;
   TodayHealth? _today;
@@ -25,7 +25,22 @@ class _StatsScreenState extends State<StatsScreen> {
   static const _weekday = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
+  }
 
   Future<void> _load() async {
     setState(() { _err = null; });

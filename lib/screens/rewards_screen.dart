@@ -154,6 +154,7 @@ class _RewardEditorDialogState extends State<RewardEditorDialog> {
   final _desc = TextEditingController();
   final _cooldown = TextEditingController(text: '0');
   late List<Map<String, dynamic>> _rewards;
+  List<String> _items = [];
 
   bool get _editing => widget.initial != null;
 
@@ -166,9 +167,46 @@ class _RewardEditorDialogState extends State<RewardEditorDialog> {
     _desc.text = (init?['description'] ?? '') as String;
     _cooldown.text = ((init?['cooldown_minutes'] ?? 0)).toString();
     _rewards = (init?['rewards'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    try {
+      final its = await widget.api.items();
+      if (mounted && its.isNotEmpty) setState(() => _items = its);
+    } on BridgeException {
+      // bridge unreachable -> fall back to free-text material entry
+    }
   }
 
   @override void dispose() { _id.dispose(); _name.dispose(); _desc.dispose(); _cooldown.dispose(); super.dispose(); }
+
+  /// Autocomplete over the real server item list (from the bridge /items endpoint).
+  Widget _materialField(Map<String, dynamic> r) {
+    final editable = _items.isEmpty;
+    return Autocomplete<String>(
+      optionsBuilder: (TextEditingValue c) {
+        if (editable) return const Iterable<String>.empty();
+        final q = c.text.trim().toUpperCase();
+        if (q.isEmpty) return _items.take(30);
+        return _items.where((i) => i.contains(q)).take(50);
+      },
+      onSelected: (v) => r['material'] = v,
+      fieldViewBuilder: (context, tc, focus, onSubmitted) {
+        final cur = r['material'] as String?;
+        if (cur != null && cur.isNotEmpty && tc.text.isEmpty) tc.text = cur;
+        return TextField(
+          controller: tc,
+          focusNode: focus,
+          decoration: InputDecoration(
+            labelText: editable ? 'Material (e.g. DIAMOND)' : 'Material — search real items',
+            helperText: editable ? null : 'matches the server item registry',
+          ),
+          onChanged: (v) => r['material'] = v,
+        );
+      },
+    );
+  }
 
   Future<void> _save() async {
     final payload = <String, dynamic>{
@@ -244,8 +282,7 @@ class _RewardEditorDialogState extends State<RewardEditorDialog> {
             decoration: const InputDecoration(labelText: 'Levels'),
             onChanged: (v) => r['levels'] = int.tryParse(v) ?? 0),
       if (r['type'] == 'ITEM') ...[
-        TextField(decoration: const InputDecoration(labelText: 'Material (e.g. DIAMOND)'),
-            onChanged: (v) => r['material'] = v),
+        _materialField(r),
         TextField(keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Amount'),
             onChanged: (v) => r['amount'] = int.tryParse(v) ?? 1),

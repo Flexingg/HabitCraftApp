@@ -88,6 +88,8 @@ class BridgeApi {
   // --- history ---
   Future<List<dynamic>> history({int limit = 100}) async =>
       (await _get('/history?limit=$limit')) as List;
+  Future<List<String>> items() async =>
+      ((await _get('/items'))['items'] as List).cast<String>();
 
   // --- console (admin) ---
   Future<String> consoleLog({int lines = 80}) async {

@@ -98,10 +98,12 @@ class HabitHealth {
     catch (_) { return false; }
   }
 
-  /// True once the core activity types are granted -> we can show data.
+  /// True once ANY core activity type is granted (subset grants still count).
   Future<bool> coreGranted() async {
-    try { return (await _health.hasPermissions(coreTypes)) ?? false; }
-    catch (_) { return false; }
+    for (final t in coreTypes) {
+      try { if (await _health.hasPermissions([t]) == true) return true; } catch (_) {}
+    }
+    return false;
   }
 
   Future<Set<HealthDataType>> _granted(List<HealthDataType> types) async {

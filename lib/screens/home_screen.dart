@@ -18,7 +18,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _health = HabitHealth();
   final _linkCtrl = TextEditingController();
 
@@ -32,7 +32,24 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _bridgeErr;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _linkCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh when the user returns from the Health Connect / Settings screens.
+    if (state == AppLifecycleState.resumed) _load();
+  }
 
   Future<void> _load() async {
     setState(() { _busy = true; });
