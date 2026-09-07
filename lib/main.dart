@@ -6,6 +6,7 @@ import 'screens/console_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/rewards_screen.dart';
+import 'screens/stats_screen.dart';
 import 'settings_dialog.dart';
 import 'theme.dart';
 
@@ -111,7 +112,8 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
           onLink: _link, onRefresh: _refreshStatus,
           onOpenSettings: (ctx) => _openSettings(ctx)),
       1 => RewardsScreen(api: api, isAdmin: _isAdmin),
-      2 => HistoryScreen(api: api, isAdmin: _isAdmin),
+      2 => StatsScreen(api: api),
+      3 => HistoryScreen(api: api, isAdmin: _isAdmin),
       _ => ConsoleScreen(api: api, isAdmin: _isAdmin),
     };
     return Scaffold(
@@ -122,6 +124,7 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Today'),
           BottomNavigationBarItem(icon: Icon(Icons.diamond_outlined), label: 'Rewards'),
+          BottomNavigationBarItem(icon: Icon(Icons.insert_chart_outlined), label: 'Stats'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
           BottomNavigationBarItem(icon: Icon(Icons.terminal), label: 'Console'),
         ],

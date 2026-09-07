@@ -39,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await _health.configure();
     _hcAvailable = await _health.isAvailable();
     if (_hcAvailable) {
-      _perm = await _health.hasPermission();
+      _perm = await _health.coreGranted();
       if (_perm) _today = await _health.readToday();
     }
 
