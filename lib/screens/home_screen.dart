@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../bridge_api.dart';
@@ -8,11 +10,15 @@ class HomeScreen extends StatefulWidget {
   final BridgeApi api;
   final bool isAdmin;
   final bool linked;
+  final String? pendingCode;
+  final String? pendingName;
   final Future<void> Function(String name) onLink;
   final Future<void> Function() onRefresh;
+  final VoidCallback onCancelPending;
   final ValueChanged<BuildContext> onOpenSettings;
   const HomeScreen({super.key, required this.api, required this.isAdmin, required this.linked,
-    required this.onLink, required this.onRefresh, required this.onOpenSettings});
+    this.pendingCode, this.pendingName, required this.onLink, required this.onRefresh,
+    required this.onCancelPending, required this.onOpenSettings});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -30,19 +36,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<String> _filedToday = [];
   bool _busy = true;
   String? _bridgeErr;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
+    if (widget.pendingCode != null) _startPoll();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stopPoll();
     _linkCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen old) {
+    super.didUpdateWidget(old);
+    if (widget.pendingCode != null && old.pendingCode == null) {
+      _startPoll();
+    } else if (widget.pendingCode == null) {
+      _stopPoll();
+    }
+  }
+
+  void _startPoll() {
+    _stopPoll();
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) => widget.onRefresh());
+  }
+
+  void _stopPoll() {
+    _poll?.cancel();
+    _poll = null;
   }
 
   @override
@@ -155,7 +184,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return ListView(padding: const EdgeInsets.all(16), children: [
       _header(),
       const SizedBox(height: 16),
-      if (!widget.linked) _linkPanel() else _playerBanner(),
+      if (!widget.linked)
+        (widget.pendingCode != null) ? _pendingPanel() : _linkPanel()
+      else
+        _playerBanner(),
       const SizedBox(height: 16),
       _healthCard(),
       const SizedBox(height: 16),
@@ -219,6 +251,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               await _load();
             } on BridgeException catch (e) { _toast(e.message); }
           }, child: const Text('Link')),
+        ]),
+      ]),
+    ));
+  }
+
+  Widget _pendingPanel() {
+    final code = widget.pendingCode ?? '';
+    final name = widget.pendingName ?? 'that account';
+    return Card(child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Confirm in Minecraft', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text('Join the server and run this command as $name to finish linking:',
+            style: const TextStyle(color: Colors.grey, fontSize: 13)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101412),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: HabitTheme.emerald, width: 1.5),
+          ),
+          child: SelectableText('/habitcraft confirm $code',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: HabitTheme.emeraldBright,
+                  fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Waiting for in-game confirmation — this updates automatically.',
+              style: const TextStyle(color: Colors.grey, fontSize: 13))),
+        ]),
+        const SizedBox(height: 4),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          TextButton(onPressed: widget.onRefresh, child: const Text('Check now')),
+          TextButton(onPressed: widget.onCancelPending, child: const Text('Cancel')),
         ]),
       ]),
     ));

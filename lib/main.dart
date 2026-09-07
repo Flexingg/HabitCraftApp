@@ -28,6 +28,8 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
   bool _loading = true;
   bool _isAdmin = false;
   bool _linked = false;
+  String? _pendingCode;
+  String? _pendingName;
 
   @override
   void initState() {
@@ -71,10 +73,29 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
     final res = await api.linkPlayer(name);
     if (mounted) {
       setState(() {
-        _linked = true;
-        _isAdmin = res['is_admin'] == true;
+        if (res['status'] == 'linked') {
+          _linked = true;
+          _isAdmin = res['is_admin'] == true;
+          _pendingCode = null;
+          _pendingName = null;
+        } else {
+          // pending -> show the in-game confirmation code
+          _linked = false;
+          _isAdmin = false;
+          _pendingCode = res['code'] as String?;
+          _pendingName = name;
+        }
       });
     }
+  }
+
+  void _cancelPending() {
+    setState(() {
+      _pendingCode = null;
+      _pendingName = null;
+      _linked = false;
+      _isAdmin = false;
+    });
   }
 
   Future<void> _refreshStatus() async {
@@ -85,6 +106,7 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
         setState(() {
           _linked = st['linked_player'] != null;
           _isAdmin = st['is_admin'] == true;
+          if (_linked) { _pendingCode = null; _pendingName = null; }
           _loading = false;
         });
       }
@@ -109,7 +131,8 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
     final api = _api!;
     final child = switch (_tab) {
       0 => HomeScreen(api: api, isAdmin: _isAdmin, linked: _linked,
-          onLink: _link, onRefresh: _refreshStatus,
+          pendingCode: _pendingCode, pendingName: _pendingName,
+          onLink: _link, onRefresh: _refreshStatus, onCancelPending: _cancelPending,
           onOpenSettings: (ctx) => _openSettings(ctx)),
       1 => RewardsScreen(api: api, isAdmin: _isAdmin),
       2 => StatsScreen(api: api),
