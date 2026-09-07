@@ -1,0 +1,50 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Health Connect read permissions -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:ignore="ProtectedPermissions"/>
+
+    <!-- Network access to reach the HabitCraft Bridge on hermes-pc -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <application
+        android:label="HabitCraft"
+        android:name="${applicationName}"
+        android:usesCleartextTraffic="true"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Health Connect app presence check -->
+        <package android:name="com.google.android.apps.healthdata"/>
+    </queries>
+</manifest>
