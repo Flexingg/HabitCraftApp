@@ -109,7 +109,7 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
     final child = switch (_tab) {
       0 => HomeScreen(api: api, isAdmin: _isAdmin, linked: _linked,
           onLink: _link, onRefresh: _refreshStatus,
-          onOpenSettings: () => _openSettings(context)),
+          onOpenSettings: (ctx) => _openSettings(ctx)),
       1 => RewardsScreen(api: api, isAdmin: _isAdmin),
       2 => HistoryScreen(api: api, isAdmin: _isAdmin),
       _ => ConsoleScreen(api: api, isAdmin: _isAdmin),
@@ -129,10 +129,10 @@ class _HabitCraftAppState extends State<HabitCraftApp> {
     );
   }
 
-  void _openSettings(BuildContext context) async {
+  Future<void> _openSettings(BuildContext ctx) async {
     final cfg = _cfg!;
     final res = await showDialog<({String base, String key})>(
-      context: context,
+      context: ctx,
       builder: (_) => SettingsDialog(baseUrl: cfg.baseUrl, apiKey: cfg.apiKey),
     );
     if (res != null) await _saveSettings(res.base, res.key);

@@ -10,7 +10,7 @@ class HomeScreen extends StatefulWidget {
   final bool linked;
   final Future<void> Function(String name) onLink;
   final Future<void> Function() onRefresh;
-  final void Function() onOpenSettings;
+  final ValueChanged<BuildContext> onOpenSettings;
   const HomeScreen({super.key, required this.api, required this.isAdmin, required this.linked,
     required this.onLink, required this.onRefresh, required this.onOpenSettings});
 
@@ -22,12 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final _health = HabitHealth();
   final _linkCtrl = TextEditingController();
 
+  bool _hcAvailable = false;
   bool _perm = false;
   TodayHealth? _today;
+  String? _linkedName;
   List<dynamic> _incentives = [];
   List<String> _filedToday = [];
-  bool _busy = false;
-  String? _err;
+  bool _busy = true;
+  String? _bridgeErr;
 
   @override
   void initState() {
@@ -36,31 +38,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _busy = true);
+    setState(() { _busy = true; });
     await _health.configure();
-    final perm = await _health.hasPermission();
-    TodayHealth? today;
-    if (perm) today = await _health.readToday();
+    _hcAvailable = await _health.isAvailable();
+    if (_hcAvailable) {
+      _perm = await _health.hasPermission();
+      if (_perm) _today = await _health.readToday();
+    }
+
     List<dynamic> incentives = [];
     List<String> filed = [];
+    String? linkedName;
     try {
       incentives = await widget.api.incentives();
       final t = await widget.api.eventsToday();
       filed = (t['auto_filed'] as List).cast<String>();
+      final cur = await widget.api.currentPlayer();
+      linkedName = (cur?['name'] as String?) ?? (widget.linked ? 'your player' : null);
+      _bridgeErr = null;
     } on BridgeException catch (e) {
-      _err = e.message;
+      _bridgeErr = e.message;
     }
+
     if (mounted) {
       setState(() {
-        _perm = perm; _today = today; _incentives = incentives; _filedToday = filed;
+        _incentives = incentives;
+        _filedToday = filed;
+        _linkedName = linkedName;
         _busy = false;
       });
     }
   }
 
-  Future<void> _grantPerm() async {
-    final ok = await _health.requestPermission();
-    setState(() => _perm = ok);
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _connectHealth() async {
+    if (!await _health.isAvailable()) {
+      _toast('Health Connect missing — opening Play Store to install it.');
+      await _health.installHealthConnect();
+      setState(() => _hcAvailable = false);
+      await _load();
+      return;
+    }
+    final outcome = await _health.requestPermission();
+    switch (outcome) {
+      case PermissionOutcome.granted:
+        _toast('Health Connect access granted.');
+      case PermissionOutcome.denied:
+        _toast('Permission not granted. Please allow Health Connect access.');
+      case PermissionOutcome.healthConnectMissing:
+        _toast('Health Connect is not installed. Opening Play Store…');
+        await _health.installHealthConnect();
+      case PermissionOutcome.error:
+        _toast('Something went wrong requesting access. Check the Android log.');
+    }
+    setState(() {});
     await _load();
   }
 
@@ -78,10 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } on BridgeException catch (e) {
       _toast(e.message);
     }
-  }
-
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -113,19 +143,22 @@ class _HomeScreenState extends State<HomeScreen> {
       Text('Craft', style: Theme.of(context).textTheme.titleLarge!.copyWith(color: HabitTheme.diamond)),
       const Spacer(),
       IconButton(icon: const Icon(Icons.settings), tooltip: 'Bridge settings',
-          onPressed: widget.onOpenSettings),
+          onPressed: () => widget.onOpenSettings(context)),
     ]);
   }
 
   Widget _playerBanner() {
+    final name = _linkedName ?? (widget.linked ? 'linked player' : '');
     return Card(child: ListTile(
       leading: const Icon(Icons.person, color: HabitTheme.emeraldBright),
-      title: const Text('Linked to Minecraft'),
+      title: Text(widget.linked ? 'Playing as $name' : 'No Minecraft account linked'),
       subtitle: Text(widget.isAdmin
           ? 'Operator — full access to rewards & console.'
-          : 'Linked player is not an op, so admin features are locked.'),
-      trailing: Icon(widget.isAdmin ? Icons.admin_panel_settings : Icons.lock,
-          color: widget.isAdmin ? HabitTheme.emerald : Colors.redAccent),
+          : (widget.linked
+              ? 'This player is not an op, so admin features are locked.'
+              : 'Link your Minecraft username below to start earning.')),
+      trailing: Icon(widget.isAdmin ? Icons.admin_panel_settings : Icons.person,
+          color: widget.isAdmin ? HabitTheme.emerald : Colors.white24),
     ));
   }
 
@@ -145,9 +178,12 @@ class _HomeScreenState extends State<HomeScreen> {
           )),
           const SizedBox(width: 8),
           FilledButton(onPressed: () async {
+            final name = _linkCtrl.text.trim();
+            if (name.isEmpty) return;
             try {
-              await widget.onLink(_linkCtrl.text.trim());
-              await widget.onRefresh();
+              await widget.onLink(name);
+              setState(() => _linkedName = name);
+              await _load();
             } on BridgeException catch (e) { _toast(e.message); }
           }, child: const Text('Link')),
         ]),
@@ -167,18 +203,19 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ]),
         const SizedBox(height: 8),
-        if (_err != null)
+        if (_bridgeErr != null)
           Padding(padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('⚠ Bridge unreachable — check settings.', style: TextStyle(color: Colors.orangeAccent)))
+            child: Text('⚠ Bridge unreachable ($_bridgeErr). Open settings (gear) to set the URL.',
+                style: const TextStyle(color: Colors.orangeAccent)))
+        else if (!_hcAvailable)
+          _action('Health Connect is not installed.', Icons.health_and_safety,
+              'Install Health Connect', _connectHealth)
         else if (!_perm)
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Grant Health Connect access to read your real activity.', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            FilledButton.icon(onPressed: _grantPerm,
-              icon: const Icon(Icons.health_and_safety), label: const Text('Connect Health Connect')),
-          ])
+          _action('Grant Health Connect access to read your real activity.', Icons.health_and_safety,
+              'Connect Health Connect', _connectHealth)
         else if (_today == null)
-          const Text('No Health Connect data yet today.', style: TextStyle(color: Colors.grey))
+          const Text('No Health Connect data recorded yet today.',
+              style: TextStyle(color: Colors.grey))
         else
           Row(children: [
             _stat(Icons.directions_walk, '${_today!.steps}', 'steps'),
@@ -187,6 +224,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
       ]),
     ));
+  }
+
+  Widget _action(String text, IconData icon, String buttonLabel, VoidCallback onTap) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(text, style: const TextStyle(color: Colors.grey)),
+      const SizedBox(height: 10),
+      FilledButton.icon(onPressed: onTap, icon: Icon(icon), label: Text(buttonLabel)),
+    ]);
   }
 
   Widget _stat(IconData icon, String value, String label) {
@@ -206,8 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final auto = inc['auto_file'] == true;
     final value = (_today != null) ? _valueFor(metric, _today!) : null;
     final met = value != null && value >= target;
-    final alreadyFiled = _filedToday.contains(id);
-    final earned = alreadyFiled;
+    final earned = _filedToday.contains(id);
 
     return Card(child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

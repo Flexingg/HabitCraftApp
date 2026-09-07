@@ -5,6 +5,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Refuse to release uncommitted work — otherwise the tag silently omits your changes.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERROR: working tree has uncommitted changes. Commit them first, then run ./release.sh"
+  git status --short
+  exit 1
+fi
+
 PART="${1:-patch}"
 PUSH=false
 for a in "$@"; do [ "$a" = "--push" ] && PUSH=true; done

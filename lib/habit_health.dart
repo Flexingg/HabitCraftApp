@@ -1,5 +1,8 @@
 import 'package:health/health.dart';
 
+/// Result of a permission request so the UI can tell the user WHAT happened.
+enum PermissionOutcome { granted, denied, healthConnectMissing, error }
+
 /// Wraps Health Connect reads (health ^13). Data stays on-device — we only report
 /// threshold-met events to the bridge.
 class HabitHealth {
@@ -20,6 +23,22 @@ class HabitHealth {
     }
   }
 
+  /// True if the Health Connect app/SDK is present and usable on this device.
+  Future<bool> isAvailable() async {
+    try {
+      return await _health.isHealthConnectAvailable();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Launch the Play Store page so the user can install Health Connect.
+  Future<void> installHealthConnect() async {
+    try {
+      await _health.installHealthConnect();
+    } catch (_) {}
+  }
+
   Future<bool> hasPermission() async {
     try {
       return await _health.hasPermissions(_types) ?? false;
@@ -28,11 +47,17 @@ class HabitHealth {
     }
   }
 
-  Future<bool> requestPermission() async {
+  /// Asks for read permission. Never throws — returns an outcome the UI can act on.
+  Future<PermissionOutcome> requestPermission() async {
     try {
-      return await _health.requestAuthorization(_types) == true;
+      final available = await isAvailable();
+      if (!available) return PermissionOutcome.healthConnectMissing;
+      final ok = await _health.requestAuthorization(_types);
+      return ok == true ? PermissionOutcome.granted : PermissionOutcome.denied;
+    } on HealthException {
+      return PermissionOutcome.error;
     } catch (_) {
-      return false;
+      return PermissionOutcome.error;
     }
   }
 
